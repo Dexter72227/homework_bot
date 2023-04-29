@@ -4,8 +4,11 @@ import sys
 import time
 import telegram
 import requests
+import json
+import contextlib
 from dotenv import load_dotenv
 from telegram import Bot
+from http import HTTPStatus
 
 
 load_dotenv()
@@ -57,7 +60,7 @@ def send_message(bot, message):
     except telegram.error.TelegramError as e:
         logging.error(f'Ошибка при отправке сообщения в Телеграм: {e}')
     else:
-        logger.debug(f"В Telegram отправлено сообщение '{message}'")
+        logger.debug(f'В Telegram отправлено сообщение "{message}"')
 
 
 def get_api_answer(timestamp_now):
@@ -67,14 +70,22 @@ def get_api_answer(timestamp_now):
     try:
         logger.info('Запрос к API-сервису')
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-        if response.status_code != 200:
+        if response.status_code != HTTPStatus.OK:
             raise ValueError(
                 f'Ошибка при запросе данных API: код {response.status_code}'
             )
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        raise ValueError(f'Ошибка при запросе данных API: {e}')
+        data = response.json()
+        if 'error' in data:
+            raise json.JSONDecodeError(data['error'], '', 0)
+        return {
+            'data': data,
+            'from_date': data.get('from_date'),
+            'status_code': HTTPStatus.OK
+        }
+    except (
+        requests.exceptions.RequestException, ValueError, json.JSONDecodeError
+    ) as e:
+        raise ValueError(f'Ошибка при запросе данных API: {e}') from e
 
 
 def check_response(response):
@@ -88,12 +99,12 @@ def check_response(response):
     keys = ['current_date', 'homeworks']
     for key in keys:
         if key not in response:
-            message = f"В ответе API нет ключа {key}"
+            message = f'В ответе API нет ключа {key}'
             raise KeyError(message)
     homework = response.get('homeworks')
     if not isinstance(homework, list):
-        message = (f"API вернул {type(homework)} под ключом homeworks, "
-                   "а должен быть список")
+        message = (f'API вернул {type(homework)} под ключом homeworks, '
+                   'а должен быть список')
         raise TypeError(message)
     return homework
 
@@ -125,21 +136,21 @@ def main():
         sys.exit(message)
 
     bot = Bot(token=TELEGRAM_TOKEN)
-    timestamp_now = int(time.time())
+    data = {'from_date': None}
 
     while True:
         try:
-            response = get_api_answer(timestamp_now)
-            homework = check_response(response)
-            if len(homework) > 0:
+            response = get_api_answer(data['from_date'])
+            homework = check_response(response['data'])
+            if len(homework):
                 message = parse_status(homework[0])
                 send_message(bot, message)
             else:
                 logger.debug("В ответе API отсутсвуют новые статусы")
-            timestamp_now = int(time.time())
+            data['from_date'] = response['from_date']
         except Exception as error:
-            message_error = f'Сбой в работе Бота: {error}'
-            logger.error(message_error)
+            with contextlib.suppress(Exception):
+                logger.error(f'Сбой в работе Бота: {error}')
         finally:
             time.sleep(RETRY_PERIOD)
 
