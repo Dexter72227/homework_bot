@@ -136,21 +136,22 @@ def main():
         sys.exit(message)
 
     bot = Bot(token=TELEGRAM_TOKEN)
-    data = {'from_date': None}
+    from_date = None
 
     while True:
         try:
-            response = get_api_answer(data['from_date'])
+            response = get_api_answer(from_date)
             homework = check_response(response['data'])
-            if len(homework):
+            if homework:
                 message = parse_status(homework[0])
                 send_message(bot, message)
             else:
                 logger.debug("В ответе API отсутсвуют новые статусы")
-            data['from_date'] = response['from_date']
+            from_date = response['from_date']
         except Exception as error:
             with contextlib.suppress(Exception):
                 logger.error(f'Сбой в работе Бота: {error}')
+                print(f'Сбой в работе Бота: {error}')
         finally:
             time.sleep(RETRY_PERIOD)
 
