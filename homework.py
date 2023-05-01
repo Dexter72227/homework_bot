@@ -47,7 +47,7 @@ def check_tokens():
         logger.info(f'Проверка токена {token}')
         if token not in os.environ:
             logger.critical(f'Ошибка: не найден токен {token}')
-            return f'Ошибка: не найден токен {token}'
+            return False
     logger.info('Токены найдены')
     return TELEGRAM_TOKEN or PRACTICUM_TOKEN or TELEGRAM_CHAT_ID
 
@@ -82,7 +82,7 @@ def get_api_answer(timestamp_now):
 
     try:
         return {
-            'data': data,
+            'data': data
         }
     except AttributeError:
         raise ValueError('Ошибка: пустой ответ API') from None
@@ -147,7 +147,7 @@ def main():
                 send_message(bot, message)
             else:
                 logger.debug("В ответе API отсутсвуют новые статусы")
-            from_date = response['data'].get('from_date')
+            from_date = response['data'].get('current_date', from_date)
         except Exception as error:
             with contextlib.suppress(Exception):
                 logger.error(f'Сбой в работе Бота: {error}')
