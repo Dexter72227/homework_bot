@@ -83,7 +83,6 @@ def get_api_answer(timestamp_now):
     try:
         return {
             'data': data,
-            'from_date': data.get('from_date')
         }
     except AttributeError:
         raise ValueError('Ошибка: пустой ответ API') from None
@@ -148,7 +147,7 @@ def main():
                 send_message(bot, message)
             else:
                 logger.debug("В ответе API отсутсвуют новые статусы")
-            from_date = response['from_date']
+            from_date = response['data'].get('from_date')
         except Exception as error:
             with contextlib.suppress(Exception):
                 logger.error(f'Сбой в работе Бота: {error}')
@@ -156,7 +155,6 @@ def main():
                     chat_id=TELEGRAM_CHAT_ID,
                     text=f'Сбой в работе Бота: {error}'
                 )
-                print(f'Сбой в работе Бота: {error}')
         finally:
             time.sleep(RETRY_PERIOD)
 
