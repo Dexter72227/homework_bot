@@ -75,17 +75,18 @@ def get_api_answer(timestamp_now):
                 f'Ошибка при запросе данных API: код {response.status_code}'
             )
         data = response.json()
-        if 'error' in data:
-            raise json.JSONDecodeError(data['error'], '', 0)
+    except json.JSONDecodeError as e:
+        raise ValueError(f'Ошибка декодирования JSON: {e}') from e
+    except requests.exceptions.RequestException as e:
+        raise ValueError(f'Ошибка при запросе данных API: {e}') from e
+
+    try:
         return {
             'data': data,
-            'from_date': data.get('from_date'),
-            'status_code': HTTPStatus.OK
+            'from_date': data.get('from_date')
         }
-    except (
-        requests.exceptions.RequestException, ValueError, json.JSONDecodeError
-    ) as e:
-        raise ValueError(f'Ошибка при запросе данных API: {e}') from e
+    except AttributeError:
+        raise ValueError('Ошибка: пустой ответ API') from None
 
 
 def check_response(response):
@@ -151,6 +152,10 @@ def main():
         except Exception as error:
             with contextlib.suppress(Exception):
                 logger.error(f'Сбой в работе Бота: {error}')
+                bot.send_message(
+                    chat_id=TELEGRAM_CHAT_ID,
+                    text=f'Сбой в работе Бота: {error}'
+                )
                 print(f'Сбой в работе Бота: {error}')
         finally:
             time.sleep(RETRY_PERIOD)
